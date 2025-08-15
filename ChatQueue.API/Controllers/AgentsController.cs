@@ -1,5 +1,6 @@
 ﻿using ChatQueue.Application.Abstractions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ChatQueue.API.Controllers;
 
@@ -11,6 +12,7 @@ public class AgentsController(ITeamRepository teams, IChatRepository chats) : Co
     private readonly IChatRepository _chats = chats;
 
     [HttpGet("{agentId:guid}/dashboard")]
+    [EnableRateLimiting("fixed")]
     public IActionResult Dashboard(Guid agentId)
     {
         var agent = _teams.GetAgentById(agentId);

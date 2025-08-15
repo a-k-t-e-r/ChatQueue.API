@@ -2,6 +2,7 @@
 using ChatQueue.Application.Chats.Commands;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ChatQueue.API.Controllers;
 
@@ -14,6 +15,7 @@ public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRep
     private readonly ITeamRepository _teams = teams;
 
     [HttpPost]
+    [EnableRateLimiting("fixed")]
     public async Task<IActionResult> CreateChat()
     {
         var result = await _mediator.Send(new CreateChatSessionCommand());
@@ -22,6 +24,7 @@ public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRep
     }
 
     [HttpPost("{id:guid}/poll")]
+    [EnableRateLimiting("fixed")]
     public async Task<IActionResult> PollChat(Guid id)
     {
         var result = await _mediator.Send(new PollChatSessionCommand(id));
@@ -30,6 +33,7 @@ public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRep
     }
 
     [HttpGet("{id:guid}")]
+    [EnableRateLimiting("fixed")]
     public IActionResult GetChatStatus(Guid id)
     {
         var chatStatus = _chats.Get(id);
@@ -47,6 +51,7 @@ public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRep
     }
 
     [HttpPost("{id:guid}/release")]
+    [EnableRateLimiting("fixed")]
     public IActionResult ReleaseChat(Guid id)
     {
         var chatRelease = _chats.Get(id);
@@ -65,6 +70,7 @@ public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRep
     }
 
     [HttpPost("{id:guid}/complete")]
+    [EnableRateLimiting("fixed")]
     public IActionResult CompleteChat(Guid id)
     {
         var s = _chats.Get(id);

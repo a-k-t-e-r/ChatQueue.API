@@ -1,10 +1,13 @@
 using ChatQueue.Application.Abstractions;
 using ChatQueue.Application.Chats.Commands;
+using ChatQueue.Core.Services;
 using ChatQueue.Infrastructure.HostedServices;
 using ChatQueue.Infrastructure.Policies;
 using ChatQueue.Infrastructure.Queues;
 using ChatQueue.Infrastructure.Repositories;
 using ChatQueue.Infrastructure.Time;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +18,19 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateChatSessionCommand).Assembly));
+
+builder.Services.AddRateLimiter(limiterOptions =>
+{
+    limiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    limiterOptions.AddFixedWindowLimiter("fixed", options =>
+    {
+        options.PermitLimit = 100;
+        options.Window = TimeSpan.FromSeconds(10);
+        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        options.QueueLimit = 10;
+    });
+});
 
 builder.Services.AddSingleton<IChatRepository, InMemoryChatRepository>();
 builder.Services.AddSingleton<ITeamRepository, InMemoryTeamRepository>();
@@ -40,6 +56,8 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.UseRateLimiter();
 
 app.Run();
 

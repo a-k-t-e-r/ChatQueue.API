@@ -1,8 +1,10 @@
 ﻿using ChatQueue.Application.Abstractions;
 using ChatQueue.Application.Chats.Commands;
+using ChatQueue.Application.Services;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Text.Json;
 
 namespace ChatQueue.API.Controllers;
 
@@ -10,11 +12,13 @@ namespace ChatQueue.API.Controllers;
 [Route("api/[controller]")]
 public class ChatsController(IMediator mediator,
                              ILogger<ChatsController> logger,
+                             ICacheService cache,
                              IChatRepository chats,
                              ITeamRepository teams) : ControllerBase
 {
     private readonly IMediator _mediator = mediator;
     private readonly ILogger<ChatsController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ICacheService _cache = cache ?? throw new ArgumentNullException(nameof(cache));
     private readonly IChatRepository _chats = chats ?? throw new ArgumentNullException(nameof(chats));
     private readonly ITeamRepository _teams = teams ?? throw new ArgumentNullException(nameof(teams));
 
@@ -58,24 +62,37 @@ public class ChatsController(IMediator mediator,
 
     [HttpGet("{id:guid}")]
     [EnableRateLimiting("fixed")]
-    public IActionResult GetChatStatus(Guid id)
+    public async Task<IActionResult> GetChatStatusAsync(Guid id)
     {
         try
         {
+            string cacheKey = $"chat_status_{id}";
+            var cachedStatus = await _cache.GetAsync<string>(cacheKey);
+            if (cachedStatus != null)
+            {
+                _logger.LogDebug($"Retrieved chat status {id} from cache");
+
+                return Ok(JsonSerializer.Deserialize<object>(cachedStatus));
+            }
+
             var chatStatus = _chats.Get(id);
             if (chatStatus is null)
                 return NotFound();
 
             _logger.LogDebug(chatStatus.Status.ToString());
 
-            return Ok(new
+            var response = new
             {
                 chatStatus.Id,
                 Status = chatStatus.Status.ToString(),
                 AssignedAgentId = chatStatus.AssignedAgentId?.ToString(),
                 chatStatus.CreatedAt,
                 chatStatus.LastPolledAt
-            });
+            };
+
+            await _cache.SetAsync(cacheKey, JsonSerializer.Serialize(response), TimeSpan.FromMinutes(5));
+
+            return Ok(response);
         }
         catch
         {
@@ -87,7 +104,7 @@ public class ChatsController(IMediator mediator,
 
     [HttpPost("{id:guid}/release")]
     [EnableRateLimiting("fixed")]
-    public IActionResult ReleaseChat(Guid id)
+    public async Task<IActionResult> ReleaseChatAsync(Guid id)
     {
         try
         {
@@ -104,6 +121,9 @@ public class ChatsController(IMediator mediator,
             chatRelease.MarkRefused();
             _chats.Update(chatRelease);
 
+            // Invalidate cache
+            await _cache.RemoveAsync($"chat_status_{id}");
+
             return Ok(new { chatRelease.Id, chatRelease.Status });
         }
         catch
@@ -116,7 +136,7 @@ public class ChatsController(IMediator mediator,
 
     [HttpPost("{id:guid}/complete")]
     [EnableRateLimiting("fixed")]
-    public IActionResult CompleteChat(Guid id)
+    public async Task<IActionResult> CompleteChatAsync(Guid id)
     {
         try
         {
@@ -131,6 +151,9 @@ public class ChatsController(IMediator mediator,
 
             s.MarkCompleted();
             _chats.Update(s);
+
+            // Invalidate cache
+            await _cache.RemoveAsync($"chat_status_{id}");
 
             return Ok(new { s.Id, s.Status });
         }

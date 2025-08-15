@@ -1,5 +1,6 @@
 using ChatQueue.Application.Abstractions;
 using ChatQueue.Application.Chats.Commands;
+using ChatQueue.Application.Services;
 using ChatQueue.Infrastructure.HostedServices;
 using ChatQueue.Infrastructure.Policies;
 using ChatQueue.Infrastructure.Queues;
@@ -22,15 +23,13 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
-// for production)
+// For production
 builder.Logging.AddJsonConsole(options =>
 {
     options.IncludeScopes = true;
     options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff";
     options.JsonWriterOptions = new JsonWriterOptions { Indented = true };
 });
-
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateChatSessionCommand).Assembly));
 
 builder.Services.AddRateLimiter(limiterOptions =>
 {
@@ -45,6 +44,11 @@ builder.Services.AddRateLimiter(limiterOptions =>
     });
 });
 
+builder.Services.AddMemoryCache();
+
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateChatSessionCommand).Assembly));
+
+builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
 builder.Services.AddSingleton<IChatRepository, InMemoryChatRepository>();
 builder.Services.AddSingleton<ITeamRepository, InMemoryTeamRepository>();
 builder.Services.AddSingleton<IQueueRepository, InMemoryQueue>();

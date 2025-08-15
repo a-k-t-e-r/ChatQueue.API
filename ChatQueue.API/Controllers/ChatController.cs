@@ -8,81 +8,137 @@ namespace ChatQueue.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ChatsController(IMediator mediator, IChatRepository chats, ITeamRepository teams) : ControllerBase
+public class ChatsController(IMediator mediator,
+                             ILogger<ChatsController> logger,
+                             IChatRepository chats,
+                             ITeamRepository teams) : ControllerBase
 {
     private readonly IMediator _mediator = mediator;
-    private readonly IChatRepository _chats = chats;
-    private readonly ITeamRepository _teams = teams;
+    private readonly ILogger<ChatsController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IChatRepository _chats = chats ?? throw new ArgumentNullException(nameof(chats));
+    private readonly ITeamRepository _teams = teams ?? throw new ArgumentNullException(nameof(teams));
 
     [HttpPost]
     [EnableRateLimiting("fixed")]
     public async Task<IActionResult> CreateChat()
     {
-        var result = await _mediator.Send(new CreateChatSessionCommand());
+        try
+        {
+            var result = await _mediator.Send(new CreateChatSessionCommand());
+            _logger.LogDebug(result.Message);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch
+        {
+            _logger.LogError("Error while creating chat");
+
+            return StatusCode(500, "Internal server error");
+        }
     }
 
     [HttpPost("{id:guid}/poll")]
     [EnableRateLimiting("fixed")]
     public async Task<IActionResult> PollChat(Guid id)
     {
-        var result = await _mediator.Send(new PollChatSessionCommand(id));
+        try
+        {
+            var result = await _mediator.Send(new PollChatSessionCommand(id));
+            _logger.LogDebug(result.Status);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch
+        {
+            _logger.LogError("Error while polling chat");
+
+            return StatusCode(500, "Internal server error");
+        }
     }
 
     [HttpGet("{id:guid}")]
     [EnableRateLimiting("fixed")]
     public IActionResult GetChatStatus(Guid id)
     {
-        var chatStatus = _chats.Get(id);
-        if (chatStatus is null)
-            return NotFound();
-
-        return Ok(new
+        try
         {
-            chatStatus.Id,
-            Status = chatStatus.Status.ToString(),
-            AssignedAgentId = chatStatus.AssignedAgentId?.ToString(),
-            chatStatus.CreatedAt,
-            chatStatus.LastPolledAt
-        });
+            var chatStatus = _chats.Get(id);
+            if (chatStatus is null)
+                return NotFound();
+
+            _logger.LogDebug(chatStatus.Status.ToString());
+
+            return Ok(new
+            {
+                chatStatus.Id,
+                Status = chatStatus.Status.ToString(),
+                AssignedAgentId = chatStatus.AssignedAgentId?.ToString(),
+                chatStatus.CreatedAt,
+                chatStatus.LastPolledAt
+            });
+        }
+        catch
+        {
+            _logger.LogError("Error while getting chat status");
+
+            return StatusCode(500, "Internal server error");
+        }
     }
 
     [HttpPost("{id:guid}/release")]
     [EnableRateLimiting("fixed")]
     public IActionResult ReleaseChat(Guid id)
     {
-        var chatRelease = _chats.Get(id);
-        if (chatRelease is null)
-            return NotFound();
-        if (chatRelease.AssignedAgentId is null)
-            return BadRequest(new { message = "No agent assigned" });
+        try
+        {
+            var chatRelease = _chats.Get(id);
+            if (chatRelease is null)
+                return NotFound();
+            if (chatRelease.AssignedAgentId is null)
+                return BadRequest(new { message = "No agent assigned" });
 
-        var agent = _teams.GetAgentById(chatRelease.AssignedAgentId.Value);
-        agent?.ReleaseChat();
+            var agent = _teams.GetAgentById(chatRelease.AssignedAgentId.Value);
+            agent?.ReleaseChat();
+            _logger.LogDebug(agent.Name);
 
-        chatRelease.MarkRefused();
-        _chats.Update(chatRelease);
+            chatRelease.MarkRefused();
+            _chats.Update(chatRelease);
 
-        return Ok(new { chatRelease.Id, chatRelease.Status });
+            return Ok(new { chatRelease.Id, chatRelease.Status });
+        }
+        catch
+        {
+            _logger.LogError("Error while getting chat release");
+
+            return StatusCode(500, "Internal server error");
+        }
     }
 
     [HttpPost("{id:guid}/complete")]
     [EnableRateLimiting("fixed")]
     public IActionResult CompleteChat(Guid id)
     {
-        var s = _chats.Get(id);
-        if (s is null) return NotFound();
-        if (s.AssignedAgentId is null) return BadRequest(new { message = "No agent assigned" });
+        try
+        {
+            var s = _chats.Get(id);
+            if (s is null)
+                return NotFound();
+            if (s.AssignedAgentId is null)
+                return BadRequest(new { message = "No agent assigned" });
 
-        var agent = _teams.GetAgentById(s.AssignedAgentId.Value);
-        agent?.ReleaseChat();
+            var agent = _teams.GetAgentById(s.AssignedAgentId.Value);
+            agent?.ReleaseChat();
 
-        s.MarkCompleted();
-        _chats.Update(s);
+            s.MarkCompleted();
+            _chats.Update(s);
 
-        return Ok(new { s.Id, s.Status });
+            return Ok(new { s.Id, s.Status });
+        }
+        catch
+        {
+            _logger.LogError("Error while getting chat complete");
+
+            return StatusCode(500, "Internal server error");
+        }
     }
 }

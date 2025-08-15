@@ -6,26 +6,17 @@ using MediatR;
 
 namespace ChatQueue.Application.Chats.Handlers;
 
-public sealed class CreateChatSessionHandler : IRequestHandler<CreateChatSessionCommand, CreateChatSessionResult>
+public sealed class CreateChatSessionHandler(IChatRepository chats,
+                                             ITeamRepository teams,
+                                             IQueueRepository queue,
+                                             IQueuePolicy policy,
+                                             IDateTimeProvider clock) : IRequestHandler<CreateChatSessionCommand, CreateChatSessionResult>
 {
-    private readonly IChatRepository _chats;
-    private readonly ITeamRepository _teams;
-    private readonly IQueueRepository _queue;
-    private readonly IQueuePolicy _policy;
-    private readonly IDateTimeProvider _clock;
-
-    public CreateChatSessionHandler(IChatRepository chats,
-                                    ITeamRepository teams,
-                                    IQueueRepository queue,
-                                    IQueuePolicy policy,
-                                    IDateTimeProvider clock)
-    {
-        _chats = chats;
-        _teams = teams;
-        _queue = queue;
-        _policy = policy;
-        _clock = clock;
-    }
+    private readonly IChatRepository _chats = chats ?? throw new ArgumentNullException(nameof(chats));
+    private readonly ITeamRepository _teams = teams ?? throw new ArgumentNullException(nameof(teams));
+    private readonly IQueueRepository _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+    private readonly IQueuePolicy _policy = policy ?? throw new ArgumentNullException(nameof(policy));
+    private readonly IDateTimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
     public Task<CreateChatSessionResult> Handle(CreateChatSessionCommand request, CancellationToken cancellationToken)
     {

@@ -1,12 +1,12 @@
 using ChatQueue.Application.Abstractions;
 using ChatQueue.Application.Chats.Commands;
-using ChatQueue.Core.Services;
 using ChatQueue.Infrastructure.HostedServices;
 using ChatQueue.Infrastructure.Policies;
 using ChatQueue.Infrastructure.Queues;
 using ChatQueue.Infrastructure.Repositories;
 using ChatQueue.Infrastructure.Time;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +16,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
+
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+// for production)
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff";
+    options.JsonWriterOptions = new JsonWriterOptions { Indented = true };
+});
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CreateChatSessionCommand).Assembly));
 

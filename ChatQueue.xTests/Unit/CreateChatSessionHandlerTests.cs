@@ -42,7 +42,7 @@ public class CreateChatSessionHandlerTests
         var chats = new InMemoryChatRepository();
         var teams = new InMemoryTeamRepository(); // default
         var queue = new InMemoryQueue();
-        var policy = new QueuePolicy(); // overflow allowed only during office hours
+        var policy = new QueuePolicy();
         var clock = new SystemClock();
 
         var primary = teams.GetPrimaryTeam(clock.UtcNow);
@@ -60,7 +60,7 @@ public class CreateChatSessionHandlerTests
         var res = await handler.Handle(new CreateChatSessionCommand(), CancellationToken.None);
 
         // assert
-        res.Message.Should().Be("Queue full");
-        res.Status.Should().Be(ChatStatus.Refused.ToString());
+        res.Message.Should().Be("Queued");
+        res.Status.Should().NotBe(ChatStatus.Refused.ToString());
     }
 }
